@@ -5,7 +5,7 @@ import subprocess
 folder_path = rf'C:\Users\noam\Documents\Compiler\C-Compiler\write_a_c_compiler\stage_2\valid'
 
 # Path to your lexer executable
-lexer_exe = 'Parser.exe'
+lexer_exe = fr'executes\Parser.exe'
 
 # Get all the C files in the folder
 c_files = [f for f in os.listdir(folder_path) if f.endswith('.c')]
@@ -24,17 +24,17 @@ for c_file in c_files:
         print(c_file , " Couldn't work")
 
     if result:
-        with open("tmp.s" , 'w') as file:
+        with open(rf"tmps\tmp.s" , 'w') as file:
             file.writelines(result.stdout)
 
-        p = subprocess.run("gcc -m64 tmp.s -o tmp" , capture_output=True)
+        p = subprocess.run(rf"gcc -m64 tmps\tmp.s -o executes\tmp" , capture_output=True)
         if p.stderr:
             print(p.stderr)
             print("Command couldn't work")
             break
 
         try:
-            p = subprocess.run("tmp.exe" , capture_output=True)
+            p = subprocess.run(rf"executes\tmp.exe" , capture_output=True)
             print(p.stdout , p.stderr)
         except Exception as e:
             print(e)
