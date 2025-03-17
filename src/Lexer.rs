@@ -24,6 +24,15 @@ pub enum Token {
     negation,
     bitwise,
     logical,
+    LogAnd,
+    LogOr,
+    EqualTo,
+    NEqualTo,
+    Less,
+    LessEq,
+    GreatTh,
+    GreatThEq,
+    Assign,
 }
 
 pub struct Lexer {
@@ -84,6 +93,10 @@ impl Lexer {
             } else if ch.is_numeric() {
                 ident_str.push(self.next_char().unwrap());
             }
+            else if ch == '&' || ch == '|'{
+                ident_str.push(self.next_char().unwrap());
+                break;
+            }
             else
             {
                 break;
@@ -96,6 +109,31 @@ impl Lexer {
             _ => Token::Ident(ident_str),
         }
     }
+
+    fn lex_identifier_then(&mut self , first_char : char) -> Token{
+        let mut ident_str = first_char.to_string();
+        let mut ch = self.peek_char()
+        if ch == '='{
+            ident_str.push_str(self.next_char());
+        }
+        else{
+            match ident_str{
+                "=" => Token::Assign,
+                "!" => Token::Logical,
+                ">" => Token::GreatTh,
+                "<" => Token::Less,
+                _ => panic!("Unkown"),
+            }
+        }
+        match ident_str{
+            "==" => Token::EqualTo,
+            "!=" => Token::NEqualTo,
+            ">=" => Token::GreatThEq,
+            "<=" => Token::LessEq,
+            _ => panic!("Unkown"),
+        }
+    } 
+
 
     pub fn next_token(&mut self) -> Token {
         while let Some(ch) = self.next_char() {
@@ -110,8 +148,9 @@ impl Lexer {
                 '{' => Token::LBrace,
                 '}' => Token::RBrace,
                 ';' => Token::Semi,
+                '!' | '=' | '<' | '>' => self.lex_identifier_then(ch),
                 '0'..='9' => self.lex_number(ch),
-                'a'..='z' | 'A'..='Z' | '_' => self.lex_identifier(ch), // Identifiers (including keywords)
+                'a'..='z' | 'A'..='Z' | '_' | '&' | '|' => self.lex_identifier(ch), // Identifiers (including keywords)
                 '~' => Token::bitwise,
                 '!' => Token::logical,
                 _ => panic!("Unexpected character: {}", ch),
