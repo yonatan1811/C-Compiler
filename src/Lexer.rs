@@ -10,7 +10,6 @@ pub enum Token {
     Minus,
     Star,
     Slash,
-    Equal,
     LParen,
     RParen,
     LBrace,
@@ -106,33 +105,32 @@ impl Lexer {
         // Handle keywords
         match ident_str.as_str() {
             "int" | "return" | "if" | "else" => Token::Keyword(ident_str),
+            "&&" => Token::LogAnd,
+            "||" => Token::LogOr,
             _ => Token::Ident(ident_str),
         }
     }
 
-    fn lex_identifier_then(&mut self , first_char : char) -> Token{
+    fn lex_identifier_then(&mut self , first_char : char) -> Token {
         let mut ident_str = first_char.to_string();
-        let mut ch = self.peek_char()
-        if ch == '='{
-            ident_str.push_str(self.next_char());
+        let mut ch = self.peek_char();
+        
+        if ch == Some('=') {
+            ident_str.push(self.next_char().unwrap());
         }
-        else{
-            match ident_str{
-                "=" => Token::Assign,
-                "!" => Token::Logical,
-                ">" => Token::GreatTh,
-                "<" => Token::Less,
-                _ => panic!("Unkown"),
-            }
-        }
-        match ident_str{
+        
+        match ident_str.as_str() {
             "==" => Token::EqualTo,
             "!=" => Token::NEqualTo,
             ">=" => Token::GreatThEq,
             "<=" => Token::LessEq,
-            _ => panic!("Unkown"),
+            "=" => Token::Assign,
+            "!" => Token::logical,
+            ">" => Token::GreatTh,
+            "<" => Token::Less,
+            _ => panic!("Unknown"),
         }
-    } 
+    }
 
 
     pub fn next_token(&mut self) -> Token {

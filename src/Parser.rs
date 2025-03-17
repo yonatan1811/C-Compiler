@@ -41,6 +41,14 @@ enum BinaryOp{
     Subtraction,
     Multiplication,
     Division,
+    Less,
+    Greater,
+    LessEq,
+    GreaterEq,
+    NotEq,
+    Equal,
+    LogAnd,
+    LogOr,
 }
 
 
@@ -135,7 +143,72 @@ impl Parser
         self.eat(Lexer::Token::RBrace);
         ASTNode::Block(statements)
     }
-    fn parse_expression(&mut self) ->ASTNode{
+
+
+    fn parse_expression(&mut self) -> ASTNode{
+        let mut left = self.parse_logical_and_expression();
+        while let Lexer::Token::LogOr = self.current_token{
+            let op = match self.current_token{
+                Lexer::Token::LogOr => BinaryOp::LogOr,
+                _ => unreachable!(),
+            };
+            self.eat(self.current_token.clone());
+            let right = self.parse_logical_and_expression();
+            left = ASTNode::BinaryOp(Box::new(left) , op , Box::new(right));
+        }
+        left
+    }
+
+
+    fn parse_logical_and_expression(&mut self) ->ASTNode{
+        let mut left = self.parse_equality_expression();
+        while let Lexer::Token::LogAnd = self.current_token{
+            let op = match self.current_token{
+                Lexer::Token::LogAnd => BinaryOp::LogAnd,
+                _ => unreachable!(),
+            };
+            self.eat(self.current_token.clone());
+            let right = self.parse_equality_expression();
+            left = ASTNode::BinaryOp(Box::new(left) , op , Box::new(right));
+        }
+        left
+    }
+
+    fn parse_equality_expression(&mut self) ->ASTNode{
+        let mut left = self.parse_relational_expression();
+        while let Lexer::Token::NEqualTo | Lexer::Token::EqualTo = self.current_token{
+            let op = match self.current_token{
+                Lexer::Token::NEqualTo => BinaryOp::NotEq,
+                Lexer::Token::EqualTo => BinaryOp::Equal,
+                _ => unreachable!(),
+            };
+            self.eat(self.current_token.clone());
+            let right = self.parse_relational_expression();
+            left = ASTNode::BinaryOp(Box::new(left) , op , Box::new(right));
+        }
+        left
+    }
+
+    fn parse_relational_expression(&mut self) -> ASTNode{
+
+        let mut left = self.parse_add_expression();
+        while let Lexer::Token::Less | Lexer::Token::GreatTh | Lexer::Token::LessEq | Lexer::Token::GreatThEq = self.current_token{
+            let op = match self.current_token{
+                Lexer::Token::Less => BinaryOp::Less,
+                Lexer::Token::GreatTh => BinaryOp::Greater,
+                Lexer::Token::LessEq => BinaryOp::LessEq,
+                Lexer::Token::GreatThEq => BinaryOp::GreaterEq,
+                _ => unreachable!(),
+            };
+            self.eat(self.current_token.clone());
+            let right = self.parse_add_expression();
+            left = ASTNode::BinaryOp(Box::new(left) , op , Box::new(right));
+        }
+        left
+    }
+
+
+    fn parse_add_expression(&mut self) ->ASTNode{
         let mut node = self.parse_term(); // Start with the term (multiplication first)
         while let Lexer::Token::Plus | Lexer::Token::Minus = self.current_token {
             let op = match self.current_token {
