@@ -1,8 +1,8 @@
 .global main
 main:
-movl $0 , %eax
-cmp $0, %eax
-sete %al
-movzbl %al, %eax
+movl $1 , %eax
+push %eax
+movl $2 , %eax
+pop %ecx
+addl %ecx,%eax
 ret
-
