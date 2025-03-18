@@ -1,11 +1,21 @@
 .global main
 main:
-movl $1 , %eax
+movl $2 , %eax
 push %rax
-movl $1 , %eax
+movl $2 , %eax
 pop %rcx
-addq %rcx, %rax
+cmpq %rcx, %rax
+sete %al
+movzbq %al, %rax
 
-not %eax
-ret
+testq %rax, %rax
+jnz .true_1
+movl $0 , %eax
+testq %rax, %rax
+jnz .true_1
+movq $0, %rax
+jmp .end_2
+.true_1:
+movq $1, %rax
+.end_2:ret
 

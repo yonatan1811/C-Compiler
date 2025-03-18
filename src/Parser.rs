@@ -407,6 +407,79 @@ pub fn genBinary(expr : &ASTNode , op : &BinaryOp  , expr2 : &ASTNode) -> String
             "{}\npush %rax         # Save e1 on stack\n{}\npop %rcx          # Load e1 into rcx\nmovq %rcx, %rax   # Move e1 into rax\ncqo               # Sign-extend rax into rdx:rax\nidivq %rcx        # rax = e1 / e2 (quotient), rdx = remainder\n", 
             res, res2
         ),
+        
+        BinaryOp::Equal => format!(
+            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsete %al\nmovzbq %al, %rax\n",
+            res, res2
+        ),
+
+        BinaryOp::NotEq =>  format!(
+            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetne %al\nmovzbq %al, %rax\n",
+            res, res2
+        ),
+
+        BinaryOp::Less => format!(
+            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetl %al\nmovzbq %al, %rax\n",
+            res, res2
+        ),
+
+        BinaryOp::LessEq => format!(
+            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetle %al\nmovzbq %al, %rax\n",
+            res, res2
+        ),
+
+        BinaryOp::Greater => format!(
+            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetg %al\nmovzbq %al, %rax\n",
+            res, res2
+        ),
+
+        BinaryOp::GreaterEq => format!(
+            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetge %al\nmovzbq %al, %rax\n",
+            res, res2
+        ),
+
+        BinaryOp::LogAnd => {
+            let label_false = new_label("false");
+            let label_end = new_label("end");
+
+            format!(
+                "{}\n\
+                testq %rax, %rax\n\
+                jz {}\n\
+                {}\n\
+                testq %rax, %rax\n\
+                jz {}\n\
+                movq $1, %rax\n\
+                jmp {}\n\
+                {}:\n\
+                movq $0, %rax\n\
+                {}:\n",
+                res, label_false, res2, label_false, label_end, label_false, label_end
+            )
+        }
+
+        BinaryOp::LogOr => {
+            let label_true = new_label("true");
+            let label_end = new_label("end");
+
+            format!(
+                "{}\n\
+                testq %rax, %rax\n\
+                jnz {}\n\
+                {}\n\
+                testq %rax, %rax\n\
+                jnz {}\n\
+                movq $0, %rax\n\
+                jmp {}\n\
+                {}:\n\
+                movq $1, %rax\n\
+                {}:\n",
+                res, label_true, res2, label_true, label_end, label_true, label_end
+            )
+        }
+
+
+
     
         _=> {
             println!("{:?}" , op);
@@ -423,7 +496,13 @@ pub fn genMov(value : f64) ->String{
     format!("movl ${} , %eax" , value as i32)
 }
 
-
+static mut LABEL_COUNT: usize = 0;
+fn new_label(base: &str) -> String {
+    unsafe {
+        LABEL_COUNT += 1;
+        format!(".{}_{}", base, LABEL_COUNT)
+    }
+}
 
 pub fn genUnary(op: &UnaryOp, expr: &ASTNode) -> String {
     // Recursively generate assembly for the inner expression
