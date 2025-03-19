@@ -20,17 +20,20 @@ pub enum Token {
     Unknown,
     Func,
     EOF,
+
     negation,
     bitwise,
     logical,
     LogAnd,
     LogOr,
+    
     EqualTo,
     NEqualTo,
     Less,
     LessEq,
     GreatTh,
     GreatThEq,
+
     Assign,
 }
 

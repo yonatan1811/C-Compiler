@@ -13,15 +13,32 @@ mod Lexer;
 //this will be the output by the end
 #[derive(Debug)]
 enum ASTNode {
+    //program
+    Program(Vec<ASTNode>),  // Holds a list of functions
+
+    //function declaration
     Function {
         name: String,
         body: Vec<ASTNode>,
-        return_type: String,
     },
-    Block(Vec<ASTNode>),
-    UnaryOp(UnaryOp , Box<ASTNode>),
-    BinaryOp(Box<ASTNode> , BinaryOp , Box<ASTNode>),
-    Return(f64),
+
+    //statement
+    Return(Box<ASTNode>),  // Holds an expression
+
+    Declare(String, Option<Box<ASTNode>>),  // Variable declaration (with optional initializer)
+
+    Assign(String, Box<ASTNode>),  // Variable assignment
+
+    //expr:
+    Exp(Box<ASTNode>),  // Wraps expressions as statements
+
+    Var(String),  // Represents variable access
+
+    BinaryOp(Box<ASTNode>, BinaryOp, Box<ASTNode>),  // Binary operation
+
+    UnaryOp(UnaryOp, Box<ASTNode>),  // Unary operation
+
+    Constant(i64),  // Integer constants
 }
 
 
@@ -58,7 +75,6 @@ struct Parser {
     current_token: Lexer::Token,
 }
 
-
 impl Parser
 {
     fn new(lexer: Lexer::Lexer) -> Self {
@@ -76,26 +92,27 @@ impl Parser
     }
 
 
-    fn parse(&mut self) -> ASTNode{
-        self.parse_function()
+    //changing parse to promgram parsing. cause we had parsing function as main, later on we will have functions so that will mess this up.
+    fn parse(&mut self) -> ASTNode {
+        let mut functions = Vec::new();
+        while self.current_token != Lexer::Token::EOF {
+            functions.push(self.parse_function());
+        }
+        ASTNode::Program(functions)
     }
 
     // Function parsing: `int main() { return 100; }`
     fn parse_function(&mut self) -> ASTNode {
-        let return_type = self.parse_type();
         let name = if let Lexer::Token::Ident(name) = self.current_token.clone() {
             self.eat(Lexer::Token::Ident(name.clone()));
             name
         } else {
             panic!("Expected function name");
         };
-        
-        
+
         self.eat(Lexer::Token::LParen);
         self.eat(Lexer::Token::RParen);
         self.eat(Lexer::Token::LBrace);
-
-        //say we don't have arguments just yet
 
         let mut body = Vec::new();
         while self.current_token != Lexer::Token::RBrace {
@@ -104,48 +121,75 @@ impl Parser
 
         self.eat(Lexer::Token::RBrace);
 
-        ASTNode::Function {
-            name,
-            return_type,
-            body,
-        }
+        ASTNode::Function { name, body }
     }
-
-    fn parse_type(&mut self) ->String{
-        match self.current_token.clone() {
-            Lexer::Token::Keyword(keyword) if keyword == "int" =>{
-                self.eat(Lexer::Token::Keyword("int".to_string()));
-                return "int".to_string();
-            }
-            Lexer::Token::Keyword(keyword) if keyword== "void" =>{
-                self.eat(Lexer::Token::Keyword("void".to_string()));
-                return "void".to_string();
-            }
-            _ => panic!("Expected type keyword , supporting int and void"),
-        }
-    }
-
 
     fn parse_statement(&mut self) -> ASTNode {
         match self.current_token.clone() {
             Lexer::Token::Keyword(keyword) if keyword == "return" => self.parse_return(),
-            Lexer::Token::LBrace => self.parse_block(),
+            Lexer::Token::Keyword(keyword) if keyword == "int" => self.parse_expression(),
+
             _ => panic!("Unexpected statement"),
         }
     }
 
-    fn parse_block(&mut self) ->ASTNode{
-        self.eat(Lexer::Token::LBrace);
-        let mut statements = Vec::new();
-        while self.current_token != Lexer::Token::RBrace {
-            statements.push(self.parse_statement());
+    
+    //Declaretion stuff :
+
+    //This function will handle declarations like : int x = 3; or int b = 2; int x = 3*(b*2); or int x;
+
+    fn parse_Assign_Or_declare(&mut self) -> ASTNode{
+        self.eat(Lexer::Token::Keyword("int".to_string()));
+        //we are expecting an identifier , a name , so we will handle it accordingly
+        let var_name = if let Lexer::Token::Ident(name) = self.current_token.clone() {
+            self.eat(Lexer::Token::Ident(name.clone()));
+            name
+        } else {
+            panic!("Expected an identifier after 'int'");
+        };
+
+        let mut init_expr = None;
+    
+        // Check for optional assignment
+        if self.current_token == Lexer::Token::Assign {
+            self.eat(Lexer::Token::Assign); // Consume '='
+            init_expr = Some(Box::new(self.parse_expression())); // Parse the expression
         }
-        self.eat(Lexer::Token::RBrace);
-        ASTNode::Block(statements)
+        //at the end of the expressio we are expecting a semi colomn ;
+        self.eat(Lexer::Token::Semi);
+        match init_expr {
+            Some(expr) => ASTNode::Assign(var_name, expr),
+            None => ASTNode::Declare(var_name, init_expr),
+        }
     }
 
-
+    
+    //All the parse expressions go here : 
+    
     fn parse_expression(&mut self) -> ASTNode{
+        if let Lexer::Token::Keyword(ref id ) = self.current_token{
+            self.eat(self.current_token.clone()); // Consume the id
+            if let Lexer::Token::Assign = self.current_token{
+                self.eat(self.current_token.clone());
+                let left = self.parse_expression();
+                match left {
+                    ASTNode::BinaryOp(b :Box<ASTNode>,op: BinaryOp,b1 :Box<ASTNode> ) => {
+                        // If left is a BinaryOp, return the assignment with the current left
+                        ASTNode::Assign(id.clone(), Box::new(left))
+                    }
+                    _ => {
+                        // If left is not a BinaryOp, parse the right side and then return the assignment
+                        let right = self.parse_logical_or_expression();
+                        ASTNode::Assign(id.clone(), Box::new(right))
+                    }
+                }
+                
+            }
+        }
+        panic!("Unexpected expression.")
+    }
+
+    fn parse_logical_or_expression(&mut self) -> ASTNode{
         let mut left = self.parse_logical_and_expression();
         while let Lexer::Token::LogOr = self.current_token{
             let op = match self.current_token{
@@ -158,6 +202,7 @@ impl Parser
         }
         left
     }
+    
 
 
     fn parse_logical_and_expression(&mut self) ->ASTNode{
@@ -244,7 +289,7 @@ impl Parser
         match self.current_token.clone() {
             Lexer::Token::Number(value) => {
                 self.eat(Lexer::Token::Number(value));
-                ASTNode::Return(value) // Return number as a node
+                ASTNode::Constant(value as i64)
             }
             Lexer::Token::Minus | Lexer::Token::bitwise | Lexer::Token::logical => {
                 let op = match self.current_token {
@@ -274,8 +319,6 @@ impl Parser
         value
     }
 
-
-
 }
 
 
@@ -287,15 +330,6 @@ impl ASTNode {
             None
         }
     }
-
-    pub fn get_return_type(&self) -> Option<&String> {
-        if let ASTNode::Function { return_type, .. } = self {
-            Some(return_type)
-        } else {
-            None
-        }
-    }
-
     pub fn get_body(&self) -> Option<&Vec<ASTNode>> {
         if let ASTNode::Function { body, .. } = self {
             Some(body)
@@ -304,222 +338,52 @@ impl ASTNode {
         }
     }
 
-    pub fn get_return_value(&self) -> Option<f64> {
-        match self {
-            ASTNode::Return(value) => Some(*value),
-            ASTNode::Function { body, .. } => {
-                for stmt in body {
-                    if let Some(value) = stmt.get_return_value() {
-                        return Some(value);
-                    }
-                }
-                None
-            }
-            ASTNode::Block(statements) => {
-                for stmt in statements {
-                    if let Some(value) = stmt.get_return_value() {
-                        return Some(value);
-                    }
-                }
-                None
-            }
-            _ => None,
-        }
-    }
-
-    pub fn get_block_statements(&self) -> Option<&Vec<ASTNode>> {
-        if let ASTNode::Block(statements) = self {
-            Some(statements)
-        } else {
-            None
-        }
-    }
 }
 
 
 
 pub fn genASm(ast: &ASTNode) -> String {
     match ast {
-        ASTNode::Function { name, body, .. } => {
+        ASTNode::Program(functions) => {
+            let mut result = String::new();
+            for func in functions {
+                result.push_str(&genASm(func));
+            }
+            result
+        }
+        ASTNode::Function { name, body } => {
             let mut result = format!(".global {}\n{}:\n", name, name);
             for stmt in body {
                 result.push_str(&genASm(stmt));
             }
-            result.push_str("ret\n");  // Ensure `ret` is properly formatted
+            result.push_str("ret\n");
             result
+        }
+        ASTNode::Return(value) => format!("{}ret\n", genASm(value)),
+        ASTNode::Constant(val) => format!("mov rax, {}\n", val),
+        ASTNode::Var(name) => format!("mov rax, [{}]\n", name),
+        ASTNode::BinaryOp(left, op, right) => {
+            let res1 = genASm(left);
+            let res2 = genASm(right);
+            let op_asm = match op {
+                BinaryOp::Addition => "add rax, rcx\n",
+                BinaryOp::Subtraction => "sub rax, rcx\n",
+                BinaryOp::Multiplication => "imul rax, rcx\n",
+                BinaryOp::Division => "idiv rcx\n",
+                _ => "", 
+            };
+            format!("{}\npush rax\n{}\npop rcx\n{}", res1, res2, op_asm)
         }
         ASTNode::UnaryOp(op, expr) => {
-            genUnary(op, expr)
-            
-        }, // Apply unary operation before returning
-        ASTNode::BinaryOp(expr ,op, expr2) =>{
-            genBinary(expr , op ,expr2)
+            let res = genASm(expr);
+            let op_asm = match op {
+                UnaryOp::Negate => "neg rax\n",
+                UnaryOp::BitNot => "not rax\n",
+                UnaryOp::Not => "cmp rax, 0\nsete al\nmovzx rax, al\n",
+            };
+            format!("{}{}", res, op_asm)
         }
-        ASTNode::Block(statements) => {
-            let mut result = String::new();
-            for stmt in statements {
-                result.push_str(&genASm(stmt));
-                println!("{:?}" ,result);
-            }
-            result
-        }
-        ASTNode::Return(value) => format!(""), // Return value
-    }
-}
-
-pub fn genFunc(ast : &ASTNode) -> String
-{
-    let mut name = ast.get_name().unwrap();
-    let mut body = ast.get_body();
-    let mut res = genRet(ast.get_return_value().unwrap());
-    format!(".global {name}\n{name}:\n{res}")
-}
-
-pub fn genBinary(expr : &ASTNode , op : &BinaryOp  , expr2 : &ASTNode) -> String{
-    let mut res = genASm(expr);
-    let mut res2 = genASm(expr2);
-
-    if let ASTNode::Return(value) = expr {
-        res = genMov(*value);  
-    }
-    
-    if let ASTNode::Return(value) = expr2 {
-        res2 = genMov(*value);  
-    }
-
-    match op {
-        BinaryOp::Addition => format!(
-            "{}\npush %rax\n{}\npop %rcx\naddq %rcx, %rax\n", 
-            res, res2
-        ),
-    
-        BinaryOp::Subtraction => format!(
-            "{}\npush %rax\n{}\npop %rcx\nsubq %rcx, %rax\n", 
-            res2, res // Order matters: `res2 - res`
-        ),
-    
-        BinaryOp::Multiplication => format!(
-            "{}\npush %rax\n{}\npop %rcx\nimulq %rcx, %rax\n", 
-            res, res2
-        ),
-    
-        BinaryOp::Division => format!(
-            "{}\npush %rax         # Save e1 on stack\n{}\npop %rcx          # Load e1 into rcx\nmovq %rcx, %rax   # Move e1 into rax\ncqo               # Sign-extend rax into rdx:rax\nidivq %rcx        # rax = e1 / e2 (quotient), rdx = remainder\n", 
-            res, res2
-        ),
-        
-        BinaryOp::Equal => format!(
-            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsete %al\nmovzbq %al, %rax\n",
-            res, res2
-        ),
-
-        BinaryOp::NotEq =>  format!(
-            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetne %al\nmovzbq %al, %rax\n",
-            res, res2
-        ),
-
-        BinaryOp::Less => format!(
-            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetl %al\nmovzbq %al, %rax\n",
-            res, res2
-        ),
-
-        BinaryOp::LessEq => format!(
-            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetle %al\nmovzbq %al, %rax\n",
-            res, res2
-        ),
-
-        BinaryOp::Greater => format!(
-            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetg %al\nmovzbq %al, %rax\n",
-            res, res2
-        ),
-
-        BinaryOp::GreaterEq => format!(
-            "{}\npush %rax\n{}\npop %rcx\ncmpq %rcx, %rax\nsetge %al\nmovzbq %al, %rax\n",
-            res, res2
-        ),
-
-        BinaryOp::LogAnd => {
-            let label_false = new_label("false");
-            let label_end = new_label("end");
-
-            format!(
-                "{}\n\
-                testq %rax, %rax\n\
-                jz {}\n\
-                {}\n\
-                testq %rax, %rax\n\
-                jz {}\n\
-                movq $1, %rax\n\
-                jmp {}\n\
-                {}:\n\
-                movq $0, %rax\n\
-                {}:\n",
-                res, label_false, res2, label_false, label_end, label_false, label_end
-            )
-        }
-
-        BinaryOp::LogOr => {
-            let label_true = new_label("true");
-            let label_end = new_label("end");
-
-            format!(
-                "{}\n\
-                testq %rax, %rax\n\
-                jnz {}\n\
-                {}\n\
-                testq %rax, %rax\n\
-                jnz {}\n\
-                movq $0, %rax\n\
-                jmp {}\n\
-                {}:\n\
-                movq $1, %rax\n\
-                {}:\n",
-                res, label_true, res2, label_true, label_end, label_true, label_end
-            )
-        }
-
-
-
-    
-        _=> {
-            println!("{:?}" , op);
-            panic!("Unknown binary operation.")
-        }
-    }
-}
-
-pub fn genRet(value : f64) -> String{
-    format!("ret")
-}
-
-pub fn genMov(value : f64) ->String{
-    format!("movl ${} , %eax" , value as i32)
-}
-
-static mut LABEL_COUNT: usize = 0;
-fn new_label(base: &str) -> String {
-    unsafe {
-        LABEL_COUNT += 1;
-        format!(".{}_{}", base, LABEL_COUNT)
-    }
-}
-
-pub fn genUnary(op: &UnaryOp, expr: &ASTNode) -> String {
-    // Recursively generate assembly for the inner expression
-    let mut res = genASm(expr);  
-
-
-    if let ASTNode::Return(value) = expr {
-        res = genMov(*value);  
-    }
-
-    // Apply the correct unary operation
-    match op {
-        UnaryOp::Negate => format!("{res}\nneg %eax\n"),  // Negate %eax
-        UnaryOp::BitNot => format!("{res}\nnot %eax\n"),  // Bitwise NOT
-        UnaryOp::Not => format!(
-            "{res}\ncmp $0, %eax\nsete %al\nmovzbl %al, %eax\n"  // Logical NOT
-        ),
+        _ => String::new(),
     }
 }
 
