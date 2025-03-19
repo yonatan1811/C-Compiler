@@ -370,6 +370,30 @@ pub fn genASm(ast: &ASTNode) -> String {
                 BinaryOp::Subtraction => "sub rax, rcx\n",
                 BinaryOp::Multiplication => "imul rax, rcx\n",
                 BinaryOp::Division => "idiv rcx\n",
+                BinaryOp::Equal => {
+                    // Equal operation (cmpq %rcx, %rax; sete %al; movzbq %al, %rax)
+                    "cmpq rcx, rax\nsete al\nmovzbq al, rax\n"
+                }
+                BinaryOp::NotEq => {
+                    // Not Equal operation (cmpq %rcx, %rax; setne %al; movzbq %al, %rax)
+                    "cmpq rcx, rax\nsetne al\nmovzbq al, rax\n"
+                }
+                BinaryOp::Less => {
+                    // Less operation (cmpq %rcx, %rax; setl %al; movzbq %al, %rax)
+                    "cmpq rcx, rax\nsetl al\nmovzbq al, rax\n"
+                }
+                BinaryOp::LessEq => {
+                    // Less or Equal operation (cmpq %rcx, %rax; setle %al; movzbq %al, %rax)
+                    "cmpq rcx, rax\nsetle al\nmovzbq al, rax\n"
+                }
+                BinaryOp::Greater => {
+                    // Greater operation (cmpq %rcx, %rax; setg %al; movzbq %al, %rax)
+                    "cmpq rcx, rax\nsetg al\nmovzbq al, rax\n"
+                }
+                BinaryOp::GreaterEq => {
+                    // Greater or Equal operation (cmpq %rcx, %rax; setge %al; movzbq %al, %rax)
+                    "cmpq rcx, rax\nsetge al\nmovzbq al, rax\n"
+                }
                 _ => "", 
             };
             format!("{}\npush rax\n{}\npop rcx\n{}", res1, res2, op_asm)
@@ -384,6 +408,14 @@ pub fn genASm(ast: &ASTNode) -> String {
             format!("{}{}", res, op_asm)
         }
         _ => String::new(),
+    }
+}
+
+static mut LABEL_COUNT: usize = 0;
+fn new_label(base: &str) -> String {
+    unsafe {
+        LABEL_COUNT += 1;
+        format!(".{}_{}", base, LABEL_COUNT)
     }
 }
 
