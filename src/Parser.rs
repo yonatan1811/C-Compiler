@@ -121,6 +121,8 @@ impl Parser
         while self.current_token != Lexer::Token::RBrace {
             body.push(self.parse_statement());
         }
+        println!("{:?}" , body);
+
 
         self.eat(Lexer::Token::RBrace);
 
@@ -149,16 +151,59 @@ impl Parser
     fn parse_statement(&mut self) -> ASTNode {
         match self.current_token.clone() {
             Lexer::Token::Keyword(keyword) if keyword == "return" => self.parse_return(),
-            Lexer::Token::Keyword(keyword) if keyword == "int" => self.parse_expression().unwrap(),
-
+            Lexer::Token::Keyword(keyword) if keyword == "int" => self.parse_Assign_Or_declare(), // Handle declaration
+            Lexer::Token::Ident(_) => self.parse_assignment_or_expression(), // Handle variable assignment
             _ => panic!("Unexpected statement"),
         }
     }
 
     
-    //Declaretion stuff :
+    
+    
+    //All the parse expressions go here : 
+    
+    fn parse_expression(&mut self) -> Option<ASTNode> {
+        // Check if it's a variable declaration (e.g., int a;)
+        if let Lexer::Token::Keyword(keyword) = self.current_token.clone() {
+            if keyword == "int" {
+                return Some(self.parse_Assign_Or_declare());
+            }
+        }
+    
+        // Start with logical OR expressions
+        let left = self.parse_logical_or_expression();
+        // Check if it's an assignment (e.g., a = 2;)
+        if let ASTNode::Var(var_name) = &left {
+            if self.current_token == Lexer::Token::Assign {
+                self.eat(Lexer::Token::Assign);
+                let right = self.parse_expression().unwrap();
+                return Some(ASTNode::Assign(var_name.clone(), Box::new(right)));
+            }
+        }
+    
+        Some(left) // Return whatever expression was parsed
+    }
+    
+    
+    
+    fn parse_assignment_or_expression(&mut self) -> ASTNode {
+        let var_name = if let Lexer::Token::Ident(name) = self.current_token.clone() {
+            self.eat(Lexer::Token::Ident(name.clone()));
+            name
+        } else {
+            panic!("Expected an identifier");
+        };
+        
+        if self.current_token == Lexer::Token::Assign {
+            self.eat(Lexer::Token::Assign);
+            let expr = self.parse_expression().unwrap();
+            self.eat(Lexer::Token::Semi);
+            return ASTNode::Assign(var_name, Box::new(expr));
+        }
+    
+        panic!("Unexpected token after identifier: {:?}", self.current_token);
+    }
 
-    //This function will handle declarations like : int x = 3; or int b = 2; int x = 3*(b*2); or int x;
 
     fn parse_Assign_Or_declare(&mut self) -> ASTNode{
         self.eat(Lexer::Token::Keyword("int".to_string()));
@@ -179,32 +224,16 @@ impl Parser
         }
         //at the end of the expressio we are expecting a semi colomn ;
         self.eat(Lexer::Token::Semi);
-        match init_expr {
-            Some(expr) => ASTNode::Assign(var_name, expr),
-            None => ASTNode::Declare(var_name, init_expr),
+
+        if let Some(expr) = init_expr {
+            ASTNode::Assign(var_name, expr) 
+        } else {
+            ASTNode::Declare(var_name, None) 
         }
     }
 
     
-    //All the parse expressions go here : 
     
-    fn parse_expression(&mut self) -> Option<ASTNode> {
-        let left = self.parse_logical_or_expression(); // Start with the lowest precedence expression
-    
-        // Check if the left-hand side is an identifier for assignment
-        if let (ASTNode::Var(var_name)) = left {
-            if let Lexer::Token::Assign = self.current_token {
-                self.eat(self.current_token.clone());
-    
-                let right = self.parse_expression()?; // Parse right-hand side expression
-                return Some(ASTNode::Assign(var_name, Box::new(right))); // Now `var_name` is a String
-            }
-    
-            return Some(ASTNode::Var(var_name)); // If no assignment, just return the variable
-        }
-    
-        Some(left) // Return whatever expression was parsed
-    }
     
     
     
@@ -330,16 +359,19 @@ impl Parser
                 self.eat(Lexer::Token::RParen);
                 expr
             }
+            Lexer::Token::Ident(var_name) => { // Handle return of variables.. like return a ...
+                let name = var_name.clone();
+                self.eat(Lexer::Token::Ident(name.clone()));
+                ASTNode::Var(name)
+            }
             _ =>{
                 panic!("Unexpected token in factor")
-
             } 
         }
     }
     
     fn parse_return(&mut self) -> ASTNode {
         self.eat(Lexer::Token::Keyword("return".to_string()));
-    
         let value = match self.parse_expression() {
             Some(expr) => expr, // Valid expression
             None => ASTNode::Constant(0), // Handle empty return
