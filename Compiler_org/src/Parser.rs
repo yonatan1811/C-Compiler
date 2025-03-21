@@ -221,11 +221,7 @@ impl Parser
         //at the end of the expressio we are expecting a semi colomn ;
         self.eat(Token::Semi);
 
-        if let Some(expr) = init_expr {
-            ASTNode::Assign(var_name, expr) 
-        } else {
-            ASTNode::Declare(var_name, None) 
-        }
+        ASTNode::Declare(var_name, (init_expr))
     }
 
     

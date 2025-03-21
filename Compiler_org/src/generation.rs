@@ -78,34 +78,38 @@ pub fn genASm(ast: &ASTNode, context: &mut CodeGenContext) -> String {
 
         // Variable Declaration
         ASTNode::Declare(name, initializer) => {
-            let offset = context.allocate_var(name);
-            let mut result = format!("subq $8, %rsp  # Allocate space for {}\n", name);
-
-            if let Some(expr) = initializer {
-                let expr_code = genASm(expr, context);
-                result.push_str(&format!(
-                    "{}\nmovq %rax, {}(%rbp)  # Store value in {}\n",
-                    expr_code, offset, name
-                ));
+            if context.get_var_exist(name) == 1 {
+                panic!("Redeclaration. invalid")
             }
+            else{
+                let offset = context.allocate_var(name);
+                let mut result = format!("subq $8, %rsp  # Allocate space for {}\n", name);
 
-            result
+                if let Some(expr) = initializer {
+                    let expr_code = genASm(expr, context);
+                    result.push_str(&format!(
+                        "{}\nmovq %rax, {}(%rbp)  # Store value in {}\n",
+                        expr_code, offset, name
+                    ));
+                }
+
+                result
+            }
         }
 
         // Variable Assignment
         ASTNode::Assign(name, expr) => {
-            let expr_code = genASm(expr, context);
-            let mut offset = 0;
-            if context.get_var_exist(name) == 1{
-                offset = context.get_var_offset(name);
+            if context.get_var_exist(name) == 0 {
+                panic!("No such var")
+            } else {
+                // Normal assignment to an existing variable
+                let offset = context.get_var_offset(name);
+                let expr_code = genASm(expr, context);
+                return format!(
+                    "{}\nmovq %rax, {}(%rbp)  # Assign value to {}\n",
+                    expr_code, offset, name
+                );
             }
-            else{
-                offset = context.allocate_var(name);
-            }
-            format!(
-                "{}\nmovq %rax, {}(%rbp)  # Assign value to {}\n",
-                expr_code, offset, name
-            )
         }
 
         // Return Statement

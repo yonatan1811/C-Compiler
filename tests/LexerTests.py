@@ -9,13 +9,15 @@ lexer_exe = rf'C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\target\d
 
 # Get all the C files in the folder
 c_files = [f for f in os.listdir(folder_path) if f.endswith('.c')]
+files_max , files_curr = len(c_files) , 0
 
 # Run the lexer on each C file
 for c_file in c_files:
     file_path = folder_path + '\\'+  c_file
     result = ""
     print("-------- Tests for -  ",  c_file , "----------------\n\n")
-    # Run the lexer via subprocess, passing the file path as an argument
+
+
     try:
         result = subprocess.run([lexer_exe, file_path], capture_output=True, text=True, check=True)
         print(result.stdout)
@@ -37,4 +39,7 @@ for c_file in c_files:
             print(e)
         else:
             print("Seems good !\n")
+            files_curr +=1
     print("------------- To The Next one !! ---------- \n\n\n")
+
+print("At total ", files_curr , " tests were passed out of - " , files_max)
