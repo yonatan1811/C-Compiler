@@ -1,0 +1,1 @@
+C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\target\debug\Compiler_org.exe: C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\src\Lexer.rs C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\src\Parser.rs C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\src\generation.rs C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\src\main.rs
