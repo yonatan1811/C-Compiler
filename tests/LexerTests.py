@@ -42,4 +42,4 @@ for c_file in c_files:
             files_curr +=1
     print("------------- To The Next one !! ---------- \n\n\n")
 
-print("At total ", files_curr , " tests were passed out of - " , files_max)
+print("At total ", files_curr , " tests passed out of - " , files_max)

@@ -141,15 +141,28 @@ impl Parser
     }
 
 
-
+    fn parse_unused_expression(&mut self) -> ASTNode {
+        let left = self.parse_expression().unwrap();
+        match &left {  
+            _ => {
+                self.eat(Token::Semi);
+                ASTNode::Exp(Box::new(left))  
+            }
+        }
+    }
 
 
     fn parse_statement(&mut self) -> ASTNode {
+        
         match self.current_token.clone() {
             Token::Keyword(keyword) if keyword == "return" => self.parse_return(),
             Token::Keyword(keyword) if keyword == "int" => self.parse_Assign_Or_declare(), // Handle declaration
+            Token::Number(value) => self.parse_unused_expression(),
             Token::Ident(_) => self.parse_assignment_or_expression(), // Handle variable assignment
-            _ => panic!("Unexpected statement"),
+            _ =>{
+                println!("Token : {:?}" , self.current_token);
+                panic!("Unexpected statement")
+            } ,
         }
     }
 
