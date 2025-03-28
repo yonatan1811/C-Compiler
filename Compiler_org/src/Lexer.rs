@@ -35,6 +35,9 @@ pub enum Token {
     GreatThEq,
 
     Assign,
+
+    Colon,
+    Question,
 }
 
 pub struct Lexer {
@@ -149,46 +152,15 @@ impl Lexer {
                 '{' => Token::LBrace,
                 '}' => Token::RBrace,
                 ';' => Token::Semi,
+                ':' => Token::Colon,
+                '?' => Token::Question,
+                '~' => Token::bitwise,
                 '!' | '=' | '<' | '>' => self.lex_identifier_then(ch),
                 '0'..='9' => self.lex_number(ch),
                 'a'..='z' | 'A'..='Z' | '_' | '&' | '|' => self.lex_identifier(ch), // Identifiers (including keywords)
-                '~' => Token::bitwise,
-                '!' => Token::logical,
                 _ => panic!("Unexpected character: {}", ch),
             };
         }
         Token::EOF
     }
-}
-
-fn main() -> io::Result<()> {
-    // Check for command-line arguments and handle the case where no argument is passed
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: {} <filename>", args[0]);
-        std::process::exit(1);
-    }
-
-    let file = &args[1];
-    let mut contents = String::new();
-    
-    // Proper string interpolation using the correct format
-
-    let mut openedfile = File::open(file)?; // The `?` operator handles potential errors
-
-    openedfile.read_to_string(&mut contents)?; // Read the content of the file into `contents`
-    println!("Content: {}", contents); // Print the contents of the file
-
-    // Create a lexer and tokenize the contents of the file
-    let mut lexer = Lexer::new(&contents);
-    loop {
-        let token = lexer.next_token();
-        println!("{:?}", token); // Print each token
-        
-        if token == Token::EOF {
-            break; // Exit the loop when EOF token is reached
-        }
-    }
-    
-    Ok(())
 }

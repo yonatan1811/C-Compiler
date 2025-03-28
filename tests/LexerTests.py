@@ -2,7 +2,7 @@ import os
 import subprocess
  
  # Path to the folder containing your C files
-folder_path = rf'C:\Users\noam\Documents\Compiler\C-Compiler\write_a_c_compiler\stage_5\valid'
+folder_path = rf'C:\Users\noam\Documents\Compiler\C-Compiler\write_a_c_compiler\stage_6\valid\statement'
 
 # Path to your lexer executable
 lexer_exe = rf'C:\Users\noam\Documents\Compiler\C-Compiler\Compiler_org\target\debug\Compiler_org.exe'

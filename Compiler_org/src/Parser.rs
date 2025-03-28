@@ -28,8 +28,17 @@ pub enum ASTNode {
 
     Assign(String, Box<ASTNode>),  // Variable assignment
 
+    Conditional(Box<ASTNode> ,  Vec<ASTNode> ,  Option<Vec<ASTNode>>), //exp is controlling condition
+    //first statement is 'if' block
+    //second statement is optional 'else' block
+
+
+
+
     //expr:
     Exp(Box<ASTNode>),  // Wraps expressions as statements
+
+    CondExp(Box<ASTNode>,Box<ASTNode>,Box<ASTNode>), //the three expressions are the condition, 'if' expression and 'else' expression, respectively
 
     Var(String),  // Represents variable access
 
@@ -114,11 +123,19 @@ impl Parser
         self.eat(Token::RParen);
         self.eat(Token::LBrace);
 
+
         let mut body = Vec::new();
         while self.current_token != Token::RBrace {
-            body.push(self.parse_statement());
-        }
+            if let Token::Keyword(keyword) = &self.current_token {
+                if keyword == "int" {
+                body.push(self.parse_Assign_Or_declare()); // Declaration
+                continue;
+                
+                }
+            }
 
+            body.push(self.parse_statement()); // Statements
+        }
 
         self.eat(Token::RBrace);
 
@@ -160,7 +177,6 @@ impl Parser
             Token::Number(value) => self.parse_unused_expression(),
             Token::Ident(_) => self.parse_assignment_or_expression(), // Handle variable assignment
             _ =>{
-                println!("Token : {:?}" , self.current_token);
                 panic!("Unexpected statement")
             } ,
         }
@@ -178,19 +194,27 @@ impl Parser
                 return Some(self.parse_Assign_Or_declare());
             }
         }
-    
-        // Start with logical OR expressions
-        let left = self.parse_logical_or_expression();
-        // Check if it's an assignment (e.g., a = 2;)
-        if let ASTNode::Var(var_name) = &left {
-            if self.current_token == Token::Assign {
-                self.eat(Token::Assign);
-                let right = self.parse_expression().unwrap();
-                return Some(ASTNode::Assign(var_name.clone(), Box::new(right)));
-            }
+        if let Token::Ident(_) = self.current_token.clone(){
+            return Some(self.parse_assignment_or_expression());
         }
-    
-        Some(left) // Return whatever expression was parsed
+
+
+        self.parse_Conditions() // Return whatever expression was parsed
+    }
+
+    fn parse_Conditions(&mut self) -> Option<ASTNode>{
+        let left = self.parse_logical_or_expression();
+        if self.current_token.clone() == Token::Question{
+            self.eat(Token::Question);
+            let if_block = self.parse_expression().unwrap();
+            self.eat(Token::Colon);
+            let else_block = self.parse_Conditions().unwrap();
+
+            Some(ASTNode::CondExp(Box::new(left), Box::new(if_block), Box::new(else_block)))
+        }
+        else{
+            Some(left)
+        }
     }
     
     
@@ -206,12 +230,13 @@ impl Parser
         if self.current_token == Token::Assign {
             self.eat(Token::Assign);
             let expr = self.parse_expression().unwrap();
-            self.eat(Token::Semi);
             return ASTNode::Assign(var_name, Box::new(expr));
         }
+        ASTNode::Var(var_name) // If no '=', it's just a variable reference
     
-        panic!("Unexpected token after identifier: {:?}", self.current_token);
     }
+
+    
 
 
     fn parse_Assign_Or_declare(&mut self) -> ASTNode{
